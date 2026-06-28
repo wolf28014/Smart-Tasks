@@ -29,7 +29,7 @@ import {
 } from "@/lib/task-utils";
 import { TAG_COLOR_META, normalizeTagColor } from "@/lib/tag-utils";
 import { useTagsOptional } from "@/lib/tag-context";
-import { Hash, ChevronDown, ChevronRight } from "lucide-react";
+import { Hash, ChevronDown, ChevronRight, Sparkles } from "lucide-react";
 
 interface ListViewProps {
   tasks: TaskData[];
@@ -51,6 +51,10 @@ interface ListViewProps {
   onAskAI?: (task: TaskData) => void;
   highlightTerms?: string[];
   onNew: () => void;
+  /** ③ Semantic search mode (AI-powered). When true, search box shows
+   *  an AI badge and results come from /api/ai/semantic-search. */
+  semanticSearch?: boolean;
+  onToggleSemanticSearch?: (v: boolean) => void;
 }
 
 export function ListView(props: ListViewProps) {
@@ -74,6 +78,8 @@ export function ListView(props: ListViewProps) {
     onAskAI,
     highlightTerms,
     onNew,
+    semanticSearch,
+    onToggleSemanticSearch,
   } = props;
 
   const [grouped, setGrouped] = useState(false);
@@ -142,9 +148,37 @@ export function ListView(props: ListViewProps) {
           <Input
             value={search}
             onChange={(e) => onSearch(e.target.value)}
-            placeholder="智能搜索（TF-IDF 全文匹配，支持中英文）..."
-            className="pl-9"
+            placeholder={
+              semanticSearch
+                ? "AI 语义搜索（输入自然语言，如「上次那个客户的事」）..."
+                : "智能搜索（TF-IDF 全文匹配，支持中英文）..."
+            }
+            className={cn(
+              "pl-9",
+              semanticSearch && "pr-24 border-emerald-300 dark:border-emerald-700",
+            )}
           />
+          {/* ③ Semantic search toggle */}
+          {onToggleSemanticSearch && (
+            <button
+              type="button"
+              onClick={() => onToggleSemanticSearch(!semanticSearch)}
+              className={cn(
+                "absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium transition-colors",
+                semanticSearch
+                  ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80",
+              )}
+              title={
+                semanticSearch
+                  ? "AI 语义搜索已开启，点击关闭"
+                  : "开启 AI 语义搜索"
+              }
+            >
+              <Sparkles className="h-2.5 w-2.5" />
+              AI
+            </button>
+          )}
         </div>
         <div className="flex gap-2 flex-wrap">
           <Select value={statusFilter} onValueChange={onStatusFilter}>

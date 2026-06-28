@@ -155,3 +155,88 @@ export function aiErrorResponse(err: unknown): {
     body: { error: "AI 处理失败", detail: message },
   };
 }
+
+// --- Embedding (for semantic search ③) -----------------------------------
+//
+// The z-ai-web-dev-sdk doesn't wrap the /embeddings endpoint, so we
+// call it directly via fetch. We use the embedding-3 model which is
+// Z.ai's standard text embedding model (1024 dimensions).
+
+const EMBEDDING_MODEL = "embedding-3";
+const EMBEDDING_CACHE = new Map<string, number[]>(); // text hash → vector
+
+/** Generate an embedding vector for the given text. */
+export async function embed(text: string): Promise<number[]> {
+  if (!isAIEnabled()) {
+    throw new Error("AI 功能未启用：请在设置中开启");
+  }
+
+  const trimmed = text.trim();
+  if (!trimmed) return [];
+
+  // Check cache (keyed by text content)
+  const cacheKey = `${trimmed.slice(0, 200)}|${trimmed.length}`;
+  if (EMBEDDING_CACHE.has(cacheKey)) {
+    return EMBEDDING_CACHE.get(cacheKey)!;
+  }
+
+  const cfg = readAIConfig();
+  const baseUrl = cfg.baseUrl.replace(/\/$/, "");
+  const url = `${baseUrl}/embeddings`;
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${cfg.apiKey}`,
+      "X-Z-AI-From": "Z",
+    },
+    body: JSON.stringify({
+      model: EMBEDDING_MODEL,
+      input: trimmed,
+    }),
+    signal: AbortSignal.timeout(15000),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(
+      `Embedding 请求失败 (HTTP ${res.status}): ${errText.slice(0, 200)}`,
+    );
+  }
+
+  const data = (await res.json()) as {
+    data?: { embedding?: number[] }[];
+  };
+
+  const vector = data.data?.[0]?.embedding;
+  if (!Array.isArray(vector) || vector.length === 0) {
+    throw new Error("Embedding 返回格式异常");
+  }
+
+  // Cache (limit cache size to 100 entries to avoid memory bloat)
+  if (EMBEDDING_CACHE.size > 100) {
+    // Delete oldest entry (first key in insertion order)
+    const firstKey = EMBEDDING_CACHE.keys().next().value;
+    if (firstKey) EMBEDDING_CACHE.delete(firstKey);
+  }
+  EMBEDDING_CACHE.set(cacheKey, vector);
+
+  return vector;
+}
+
+/** Compute cosine similarity between two vectors. Returns 0-1. */
+export function cosineSimilarity(a: number[], b: number[]): number {
+  if (a.length === 0 || a.length !== b.length) return 0;
+  let dot = 0;
+  let normA = 0;
+  let normB = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  const denom = Math.sqrt(normA) * Math.sqrt(normB);
+  if (denom === 0) return 0;
+  return dot / denom;
+}

@@ -69,3 +69,14 @@ model Tag {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+// Stores the embedding vector for a task, used by semantic search (③).
+// We store the vector as a JSON string array because SQLite doesn't
+// have a native vector type. Queries load all rows into memory and
+// compute cosine similarity — fine for <10k tasks.
+model TaskEmbedding {
+  taskId    String   @id // matches Task.id (1:1)
+  embedding String   // JSON array of numbers, e.g. "[0.1, 0.2, ...]"
+  model     String   @default("embedding-3") // which embedding model was used
+  updatedAt DateTime @updatedAt
+}

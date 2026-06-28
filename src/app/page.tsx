@@ -17,6 +17,8 @@ import {
   Hash,
   FileText,
   Settings,
+  Copy,
+  CalendarClock,
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -66,6 +68,10 @@ import { AiDailyFocus } from "@/components/todolist/ai-daily-focus";
 import { AiWeeklyReport } from "@/components/todolist/ai-weekly-report";
 import { AiChatDrawer } from "@/components/todolist/ai-chat-drawer";
 import { SettingsDialog } from "@/components/todolist/settings-dialog";
+import { AiRetrospectCard } from "@/components/todolist/ai-retrospect-card";
+import { AiInsights } from "@/components/todolist/ai-insights";
+import { AiDuplicatesDialog } from "@/components/todolist/ai-duplicates-dialog";
+import { AiRescheduleDialog } from "@/components/todolist/ai-reschedule-dialog";
 
 import {
   buildIndex,
@@ -146,6 +152,11 @@ function HomeInner() {
   // AI settings dialog
   const [settingsOpen, setSettingsOpen] = useState(false);
 
+  // ⑥ AI duplicates dialog
+  const [duplicatesOpen, setDuplicatesOpen] = useState(false);
+  // ⑦ AI reschedule dialog
+  const [rescheduleOpen, setRescheduleOpen] = useState(false);
+
   // AI chat drawer (E1) — global, no task context
   const [aiChatOpen, setAiChatOpen] = useState(false);
   // AI chat drawer (E2) — task-scoped
@@ -153,6 +164,69 @@ function HomeInner() {
 
   // Voice transcription result (E3) — fed into A2 quick create
   const [voiceText, setVoiceText] = useState<string | undefined>(undefined);
+
+  // ② AI retrospect card — shown when a task is marked done
+  const [retrospectTask, setRetrospectTask] = useState<TaskData | null>(null);
+
+  // ③ Semantic search — when AI enabled, defaults to ON (from settings)
+  const [semanticSearch, setSemanticSearch] = useState<boolean | null>(null);
+  const [semanticResults, setSemanticResults] = useState<
+    Map<string, number> | null
+  >(null);
+
+  // Load semantic search preference from AI settings
+  React.useEffect(() => {
+    if (ai.enabled && semanticSearch === null) {
+      fetch("/api/ai/settings", { cache: "no-store" })
+        .then((r) => r.json())
+        .then((d) => setSemanticSearch(d.semanticSearch !== false))
+        .catch(() => setSemanticSearch(false));
+    } else if (!ai.enabled) {
+      setSemanticSearch(null);
+      setSemanticResults(null);
+    }
+  }, [ai.enabled, semanticSearch]);
+
+  // Run semantic search when query changes (debounced)
+  React.useEffect(() => {
+    if (!ai.enabled || !semanticSearch || !search1.trim()) {
+      setSemanticResults(null);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch("/api/ai/semantic-search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: search1, limit: 20 }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const m = new Map<string, number>();
+          for (const r of data.results ?? []) {
+            m.set(r.task.id, r.score);
+          }
+          setSemanticResults(m);
+        }
+      } catch {
+        // silent fail
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [search1, ai.enabled, semanticSearch]);
+
+  // ③ Backfill embeddings for all tasks on first load (if AI enabled)
+  const backfillRef = React.useRef(false);
+  React.useEffect(() => {
+    if (ai.enabled && !backfillRef.current && tasks.length > 0) {
+      backfillRef.current = true;
+      fetch("/api/ai/embed", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ all: true }),
+      }).catch(() => {});
+    }
+  }, [ai.enabled, tasks.length]);
 
   // Pomodoro overlay
   const [pomodoroTask, setPomodoroTask] = useState<TaskData | null>(null);
@@ -295,7 +369,16 @@ function HomeInner() {
       list = list.filter((t) => t.priority === priorityFilter);
     }
 
-    if (searchResults) {
+    // ③ Semantic search takes priority over TF-IDF when enabled
+    if (semanticResults && semanticResults.size > 0) {
+      list = list
+        .filter((t) => semanticResults.has(t.id))
+        .sort(
+          (a, b) =>
+            (semanticResults.get(b.id) ?? 0) -
+            (semanticResults.get(a.id) ?? 0),
+        );
+    } else if (searchResults) {
       list = searchResults.map((r) => r.task);
     }
 
@@ -307,7 +390,9 @@ function HomeInner() {
       cancelled: 3,
     };
     const sorted = [...list];
-    if (searchResults) {
+    if (semanticResults && semanticResults.size > 0) {
+      // keep semantic relevance order
+    } else if (searchResults) {
       // keep TF-IDF relevance order
     } else if (sort === "due") {
       sorted.sort((a, b) => {
@@ -325,7 +410,7 @@ function HomeInner() {
       sorted.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     }
     return sorted;
-  }, [tasks, statusFilter, priorityFilter, search1, sort, searchResults]);
+  }, [tasks, statusFilter, priorityFilter, search1, sort, searchResults, semanticResults]);
 
   // --- Mutations -----------------------------------------------------------
 
@@ -357,6 +442,14 @@ function HomeInner() {
         const { task } = await res.json();
         setTasks((prev) => [task, ...prev]);
         toast({ title: "已创建", description: task.title });
+        // ③ Async: generate embedding for the new task (fire and forget)
+        if (ai.enabled) {
+          fetch("/api/ai/embed", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ taskId: task.id }),
+          }).catch(() => {});
+        }
       }
     } catch (err) {
       toast({
@@ -402,6 +495,10 @@ function HomeInner() {
       }
       const { task: updated } = await res.json();
       setTasks((prev) => prev.map((t) => (t.id === task.id ? updated : t)));
+      // ② Trigger AI retrospect when task is marked done
+      if (nextStatus === "done" && ai.enabled) {
+        setRetrospectTask(updated);
+      }
     } catch (err) {
       setTasks((prev) => prev.map((t) => (t.id === task.id ? task : t)));
       toast({
@@ -573,6 +670,82 @@ function HomeInner() {
         variant: "destructive",
       });
     }
+  }
+
+  // ② Save AI retrospect to the task's notes (append, not replace)
+  async function handleSaveRetrospect(taskId: string, retrospect: string) {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return;
+    const existing = task.noteMarkdown ?? "";
+    const updated = existing
+      ? `${existing}\n\n${retrospect}`
+      : retrospect;
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === taskId ? { ...t, noteMarkdown: updated } : t,
+      ),
+    );
+    try {
+      const res = await fetch(`/api/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ noteMarkdown: updated }),
+      });
+      if (!res.ok) throw new Error("保存复盘失败");
+    } catch (err) {
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === taskId ? { ...t, noteMarkdown: existing } : t,
+        ),
+      );
+      toast({
+        title: "保存复盘失败",
+        description: err instanceof Error ? err.message : "未知错误",
+        variant: "destructive",
+      });
+    }
+  }
+
+  // ⑥ Merge duplicate tasks (keep first, soft-delete rest)
+  async function handleMergeDuplicates(
+    keepId: string,
+    deleteIds: string[],
+  ) {
+    for (const id of deleteIds) {
+      setTasks((prev) => prev.filter((t) => t.id !== id));
+      try {
+        await fetch(`/api/tasks/${id}`, { method: "DELETE" });
+      } catch {
+        // revert on failure
+        const task = tasks.find((t) => t.id === id);
+        if (task) setTasks((prev) => [task, ...prev]);
+        throw new Error(`删除任务 ${id} 失败`);
+      }
+    }
+  }
+
+  // ⑦ Apply reschedule proposals
+  async function handleApplyReschedule(
+    proposals: Array<{ taskId: string; newDueDate: string }>,
+  ) {
+    for (const p of proposals) {
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === p.taskId ? { ...t, dueDate: p.newDueDate } : t,
+        ),
+      );
+      try {
+        const res = await fetch(`/api/tasks/${p.taskId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ dueDate: p.newDueDate }),
+        });
+        if (!res.ok) throw new Error("更新截止日期失败");
+      } catch (err) {
+        throw err;
+      }
+    }
+    reload();
   }
 
   // --- Render --------------------------------------------------------------
@@ -765,6 +938,20 @@ function HomeInner() {
             }
             highlightTerms={search1.trim() ? highlightTerms : undefined}
             onNew={openNew}
+            semanticSearch={!!semanticSearch}
+            onToggleSemanticSearch={
+              ai.enabled
+                ? (v) => {
+                    setSemanticSearch(v);
+                    // Persist to settings
+                    fetch("/api/ai/settings", {
+                      method: "PUT",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ semanticSearch: v }),
+                    }).catch(() => {});
+                  }
+                : undefined
+            }
           />
         )}
         {view === "kanban" && (
@@ -787,7 +974,23 @@ function HomeInner() {
           <>
             {ai.enabled && <AiDailyFocus tasks={tasks} onEdit={openEdit} />}
             {ai.enabled && (
-              <div className="flex justify-end mb-4">
+              <div className="flex justify-end mb-4 gap-2 flex-wrap">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setDuplicatesOpen(true)}
+                >
+                  <Copy className="h-4 w-4 mr-1.5" />
+                  扫描重复任务
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setRescheduleOpen(true)}
+                >
+                  <CalendarClock className="h-4 w-4 mr-1.5" />
+                  AI 智能重排
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
@@ -798,6 +1001,7 @@ function HomeInner() {
                 </Button>
               </div>
             )}
+            {ai.enabled && <AiInsights taskCount={tasks.length} />}
             <DashboardView tasks={tasks} />
           </>
         )}
@@ -876,6 +1080,7 @@ function HomeInner() {
         onSave={handleSaveNote}
         allTaskTitles={tasks.map((t) => t.title)}
         currentTaskId={noteTask?.id}
+        aiEnabled={ai.enabled}
       />
 
       {/* Data import/export dialog */}
@@ -897,6 +1102,29 @@ function HomeInner() {
 
       {/* AI settings dialog */}
       <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+
+      {/* ⑥ AI duplicates dialog */}
+      <AiDuplicatesDialog
+        open={duplicatesOpen}
+        onOpenChange={setDuplicatesOpen}
+        onMerge={handleMergeDuplicates}
+      />
+
+      {/* ⑦ AI reschedule dialog */}
+      <AiRescheduleDialog
+        open={rescheduleOpen}
+        onOpenChange={setRescheduleOpen}
+        onApply={handleApplyReschedule}
+      />
+
+      {/* ② AI retrospect card — shown when task marked done */}
+      {retrospectTask && ai.enabled && (
+        <AiRetrospectCard
+          task={retrospectTask}
+          onClose={() => setRetrospectTask(null)}
+          onSaveToNotes={handleSaveRetrospect}
+        />
+      )}
 
       {/* AI chat drawer — E1 (global) or E2 (task-scoped) */}
       <AiChatDrawer

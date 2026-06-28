@@ -26,7 +26,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Calendar as CalendarIcon, X, Plus, RotateCcw, Info, Sparkles, Loader2 } from "lucide-react";
+import { Calendar as CalendarIcon, X, Plus, RotateCcw, Info, Sparkles, Loader2, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -89,6 +89,48 @@ export function TaskDialog({
 
   const tagCtx = useTagsOptional();
   const ai = useAIOptional();
+
+  // ① AI conflict check
+  const [conflictWarnings, setConflictWarnings] = useState<
+    Array<{ type: string; message: string; severity: string }>
+  >([]);
+  const [checkingConflicts, setCheckingConflicts] = useState(false);
+
+  // Debounced AI conflict check — runs when title or dueDate changes
+  useEffect(() => {
+    if (!ai?.enabled || !title.trim() || title.trim().length < 3) {
+      setConflictWarnings([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setCheckingConflicts(true);
+      try {
+        const res = await fetch("/api/ai/check-conflicts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            task: {
+              title,
+              description,
+              dueDate,
+              priority,
+              tags,
+            },
+            existingTaskId: task?.id,
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setConflictWarnings(data.warnings ?? []);
+        }
+      } catch {
+        // silent fail — don't block editing
+      } finally {
+        setCheckingConflicts(false);
+      }
+    }, 800); // 800ms debounce
+    return () => clearTimeout(timer);
+  }, [title, description, dueDate, priority, tags, ai?.enabled, task?.id]);
 
   // A1: AI subtask splitting
   const [aiSplitting, setAiSplitting] = useState(false);
@@ -405,6 +447,33 @@ export function TaskDialog({
               placeholder="例如：完成季度产品规划文档"
               autoFocus
             />
+            {/* ① AI conflict warnings */}
+            {checkingConflicts && (
+              <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                AI 正在检查潜在冲突...
+              </div>
+            )}
+            {conflictWarnings.length > 0 && !checkingConflicts && (
+              <div className="space-y-1">
+                {conflictWarnings.map((w, i) => (
+                  <div
+                    key={i}
+                    className={cn(
+                      "flex items-start gap-1.5 rounded-md border px-2 py-1 text-xs",
+                      w.severity === "high"
+                        ? "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-800 dark:bg-rose-950/30 dark:text-rose-300"
+                        : w.severity === "medium"
+                          ? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300"
+                          : "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-950/30 dark:text-sky-300",
+                    )}
+                  >
+                    <AlertCircle className="h-3 w-3 shrink-0 mt-0.5" />
+                    <span>{w.message}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Description */}

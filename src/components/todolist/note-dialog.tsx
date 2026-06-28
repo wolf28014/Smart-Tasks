@@ -13,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { FileText, Eye, Pencil, Link2 } from "lucide-react";
+import { FileText, Eye, Pencil, Link2, Sparkles, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface NoteDialogProps {
@@ -25,6 +25,9 @@ interface NoteDialogProps {
   /** All tasks, used to suggest link targets in the wikilink autocomplete. */
   allTaskTitles?: string[];
   currentTaskId?: string;
+  /** ⑤ AI link suggestions — when true, show AI-powered related task
+   *  recommendations in a sidebar. */
+  aiEnabled?: boolean;
 }
 
 export function NoteDialog({
@@ -35,6 +38,7 @@ export function NoteDialog({
   onSave,
   allTaskTitles = [],
   currentTaskId,
+  aiEnabled = false,
 }: NoteDialogProps) {
   const [draft, setDraft] = React.useState("");
   const [saving, setSaving] = React.useState(false);
@@ -47,6 +51,59 @@ export function NoteDialog({
     end: number;
     text: string;
   } | null>(null);
+
+  // ⑤ AI link suggestions
+  const [aiSuggestions, setAiSuggestions] = React.useState<
+    Array<{ taskId: string; title: string; reason: string }>
+  >([]);
+  const [aiLoading, setAiLoading] = React.useState(false);
+
+  // Fetch AI link suggestions when dialog opens (debounced on draft change)
+  React.useEffect(() => {
+    if (!open || !aiEnabled || draft.trim().length < 10) {
+      setAiSuggestions([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setAiLoading(true);
+      try {
+        const res = await fetch("/api/ai/suggest-links", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            noteContent: draft,
+            currentTaskId,
+          }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setAiSuggestions(data.suggestions ?? []);
+        }
+      } catch {
+        // silent fail
+      } finally {
+        setAiLoading(false);
+      }
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [open, aiEnabled, draft, currentTaskId]);
+
+  function insertAiLink(title: string) {
+    const insertion = `[[${title}]] `;
+    const el = textareaRef.current;
+    if (!el) {
+      setDraft((prev) => prev + insertion);
+      return;
+    }
+    const cursor = el.selectionStart;
+    const next = draft.slice(0, cursor) + insertion + draft.slice(cursor);
+    setDraft(next);
+    requestAnimationFrame(() => {
+      el.focus();
+      const pos = cursor + insertion.length;
+      el.setSelectionRange(pos, pos);
+    });
+  }
 
   React.useEffect(() => {
     if (open) {
@@ -129,7 +186,7 @@ export function NoteDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[720px] max-h-[90vh] flex flex-col">
+      <DialogContent className="sm:max-w-[820px] max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-4 w-4 text-emerald-500" />
@@ -140,6 +197,9 @@ export function NoteDialog({
           </DialogDescription>
         </DialogHeader>
 
+        <div className="flex-1 flex gap-3 min-h-0">
+          {/* Main editor area */}
+          <div className="flex-1 flex flex-col min-w-0">
         <Tabs
           value={tab}
           onValueChange={(v) => setTab(v as "edit" | "preview")}
@@ -220,6 +280,50 @@ export function NoteDialog({
             )}
           </TabsContent>
         </Tabs>
+          </div>
+
+          {/* ⑤ AI link suggestions sidebar */}
+          {aiEnabled && tab === "edit" && (
+            <div className="w-48 shrink-0 border-l pl-3 overflow-y-auto">
+              <div className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
+                <Sparkles className="h-3 w-3 text-emerald-500" />
+                AI 关联推荐
+              </div>
+              {aiLoading && (
+                <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground py-2">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  分析中...
+                </div>
+              )}
+              {!aiLoading && aiSuggestions.length === 0 && draft.trim().length >= 10 && (
+                <div className="text-[11px] text-muted-foreground py-2">
+                  暂无推荐
+                </div>
+              )}
+              {!aiLoading && draft.trim().length < 10 && (
+                <div className="text-[11px] text-muted-foreground py-2">
+                  写点内容后会出现推荐
+                </div>
+              )}
+              <div className="space-y-1.5">
+                {aiSuggestions.map((s) => (
+                  <button
+                    key={s.taskId}
+                    onClick={() => insertAiLink(s.title)}
+                    className="w-full text-left rounded-md border border-border/60 hover:border-emerald-300 dark:hover:border-emerald-700 hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 p-2 transition-colors group"
+                  >
+                    <div className="text-xs font-medium truncate group-hover:text-emerald-700 dark:group-hover:text-emerald-300">
+                      {s.title}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2">
+                      {s.reason}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
 
         <DialogFooter className="gap-2">
           {note && (

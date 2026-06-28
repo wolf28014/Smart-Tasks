@@ -22,6 +22,7 @@ interface AIConfig {
   apiKey: string;
   model?: string;
   enabled: boolean;
+  semanticSearch?: boolean; // ③ semantic search default on/off
 }
 
 const DEFAULT_CONFIG: AIConfig = {
@@ -29,6 +30,7 @@ const DEFAULT_CONFIG: AIConfig = {
   apiKey: "",
   model: "glm-4-plus",
   enabled: false,
+  semanticSearch: true, // default ON per user request
 };
 
 // Read config from file. Returns default if file doesn't exist or is
@@ -52,6 +54,7 @@ export function readAIConfig(): AIConfig {
       apiKey: typeof parsed.apiKey === "string" ? parsed.apiKey : "",
       model: typeof parsed.model === "string" ? parsed.model : DEFAULT_CONFIG.model,
       enabled: parsed.enabled !== false,
+      semanticSearch: parsed.semanticSearch !== false, // default true
     };
   } catch {
     // Project config doesn't exist — try system config
@@ -63,7 +66,8 @@ export function readAIConfig(): AIConfig {
         baseUrl: sysParsed.baseUrl || DEFAULT_CONFIG.baseUrl,
         apiKey: sysParsed.apiKey || "",
         model: sysParsed.model || DEFAULT_CONFIG.model,
-        enabled: true, // system config is assumed valid
+        enabled: true,
+        semanticSearch: true, // default on for system config too
       };
     } catch {
       return { ...DEFAULT_CONFIG };
@@ -87,23 +91,19 @@ export async function GET() {
     baseUrl: cfg.baseUrl,
     model: cfg.model,
     enabled: cfg.enabled,
+    semanticSearch: cfg.semanticSearch,
     hasApiKey: !!cfg.apiKey,
-    // Return apiKey only if it's empty (so the frontend can show the
-    // placeholder). When set, return a masked preview.
     apiKeyPreview: cfg.apiKey ? maskKey(cfg.apiKey) : "",
   });
 }
 
-// PUT /api/ai/settings — update AI config.
-// Body: { baseUrl?, apiKey?, model?, enabled? }
-//   - apiKey is optional; if omitted, the existing key is preserved
-//     (so the user can toggle enabled without re-entering the key).
 export async function PUT(req: NextRequest) {
   let body: {
     baseUrl?: string;
     apiKey?: string;
     model?: string;
     enabled?: boolean;
+    semanticSearch?: boolean;
   };
   try {
     body = await req.json();
@@ -120,12 +120,16 @@ export async function PUT(req: NextRequest) {
     apiKey:
       typeof body.apiKey === "string"
         ? body.apiKey.trim()
-        : current.apiKey, // preserve existing if not provided
+        : current.apiKey,
     model:
       typeof body.model === "string" && body.model.trim()
         ? body.model.trim()
         : current.model,
     enabled: typeof body.enabled === "boolean" ? body.enabled : current.enabled,
+    semanticSearch:
+      typeof body.semanticSearch === "boolean"
+        ? body.semanticSearch
+        : current.semanticSearch,
   };
 
   // Validate: if enabling AI, must have apiKey
@@ -144,6 +148,7 @@ export async function PUT(req: NextRequest) {
         baseUrl: next.baseUrl,
         model: next.model,
         enabled: next.enabled,
+        semanticSearch: next.semanticSearch,
         hasApiKey: !!next.apiKey,
         apiKeyPreview: maskKey(next.apiKey),
       },
