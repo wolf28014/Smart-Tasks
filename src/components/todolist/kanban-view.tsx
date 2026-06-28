@@ -151,25 +151,57 @@ function KanbanColumn({
 
   return (
     <div className="flex flex-col">
-      <div className="mb-3 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className={cn("h-2.5 w-2.5 rounded-full", meta.dot)} />
-          <h3 className="font-semibold text-sm">{meta.label}</h3>
-          <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground tabular-nums">
-            {tasks.length}
-          </span>
-        </div>
-        {status === "todo" && (
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-7 w-7"
-            onClick={onNew}
-            aria-label="新建任务"
-          >
-            <Plus className="h-4 w-4" />
-          </Button>
+      {/* Column header — large color-block banner similar to the list view
+          group header. Uses status color for instant visual scanning. */}
+      <div
+        className={cn(
+          "mb-3 flex items-center gap-2.5 rounded-xl border px-3 py-2.5",
+          meta.bg,
+          "border-border/60",
         )}
+      >
+        <span
+          className={cn(
+            "h-7 w-7 rounded-lg flex items-center justify-center shrink-0 shadow-sm",
+            meta.dot,
+          )}
+          aria-hidden
+        >
+          <span className="h-2.5 w-2.5 rounded-full bg-white/90" />
+        </span>
+        <h3
+          className={cn(
+            "text-base font-semibold tracking-tight",
+            meta.color,
+          )}
+        >
+          {meta.label}
+        </h3>
+        <span
+          className={cn(
+            "text-xs font-medium px-2 py-0.5 rounded-full tabular-nums",
+            "bg-background/70 text-foreground/70",
+          )}
+        >
+          {tasks.length}
+        </span>
+        <div className="ml-auto flex items-center">
+          {status === "todo" && (
+            <Button
+              size="icon"
+              variant="ghost"
+              className={cn(
+                "h-7 w-7",
+                meta.color,
+                "hover:bg-black/5 dark:hover:bg-white/10",
+              )}
+              onClick={onNew}
+              aria-label="新建任务"
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
       </div>
       <div
         ref={setNodeRef}

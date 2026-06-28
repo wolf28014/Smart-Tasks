@@ -15,7 +15,6 @@ import {
   StickyNote,
   MoreHorizontal,
   Hash,
-  Image as ImageIcon,
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -603,6 +602,8 @@ function HomeInner() {
               />
             </div>
 
+            {/* Appearance: background + theme, grouped together */}
+            <BackgroundSelector />
             <ThemeToggle />
 
             {/* Primary: new task */}
@@ -612,7 +613,7 @@ function HomeInner() {
               <span className="sm:hidden">新建</span>
             </Button>
 
-            {/* Secondary: tag manager, data, background, autosave-on-mobile */}
+            {/* Secondary: tag manager, data, autosave-on-mobile */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="icon" className="h-9 w-9" aria-label="更多">
@@ -633,22 +634,6 @@ function HomeInner() {
                 <DropdownMenuItem onClick={() => setDataOpen(true)}>
                   <Database className="h-4 w-4 mr-2" />
                   导入 / 导出数据
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel className="text-xs">外观</DropdownMenuLabel>
-                <DropdownMenuItem
-                  onSelect={(e) => {
-                    e.preventDefault();
-                  }}
-                  className="p-0"
-                >
-                  <div className="w-full flex items-center justify-between px-2 py-1.5">
-                    <span className="flex items-center">
-                      <ImageIcon className="h-4 w-4 mr-2" />
-                      自定义背景
-                    </span>
-                    <BackgroundSelector compact />
-                  </div>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <div className="sm:hidden px-2 py-1.5">
