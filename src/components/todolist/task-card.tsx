@@ -179,7 +179,7 @@ export function TaskCard({
               )}
               <h3
                 className={cn(
-                  "font-medium leading-snug break-words",
+                  "font-medium leading-snug break-words text-foreground",
                   done && "line-through text-muted-foreground",
                   cancelled && "line-through text-muted-foreground",
                 )}
