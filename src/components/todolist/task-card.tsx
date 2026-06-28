@@ -194,8 +194,10 @@ export function TaskCard({
             )}
           </div>
 
-          {/* Hover actions */}
-          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          {/* Hover actions — absolute positioned so they don't squeeze
+              the title when hidden. They overlay the right edge of the
+              card on hover with a subtle gradient backdrop. */}
+          <div className="absolute right-2 top-2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-l from-card via-card/90 to-card/0 pl-6 pr-1 rounded-l-md">
             {onAskAI && (
               <Button
                 size="icon"
