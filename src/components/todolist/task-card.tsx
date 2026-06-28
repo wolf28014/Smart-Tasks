@@ -159,7 +159,7 @@ export function TaskCard({
             className="mt-1 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
           />
 
-          <div className="flex-1 min-w-0 pr-1 group-hover:pr-20 transition-[padding] duration-150">
+          <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               {subTotal > 0 && (
                 <button
@@ -179,7 +179,7 @@ export function TaskCard({
               )}
               <h3
                 className={cn(
-                  "text-[15px] font-semibold leading-snug break-words text-foreground tracking-tight",
+                  "text-[15px] font-semibold leading-snug break-words text-foreground tracking-tight pr-1 group-hover:pr-20 transition-all duration-150",
                   done && "line-through text-muted-foreground font-medium",
                   cancelled && "line-through text-muted-foreground font-medium",
                 )}
