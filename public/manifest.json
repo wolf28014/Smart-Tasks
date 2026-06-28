@@ -1,0 +1,35 @@
+{
+  "name": "智能待办 TodoList",
+  "short_name": "待办",
+  "description": "功能强大的智能待办管理系统：任务、子任务、番茄钟、Markdown 笔记、看板、日历、甘特图、笔记图谱",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#10b981",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "新建任务",
+      "short_name": "新建",
+      "url": "/?action=new"
+    },
+    {
+      "name": "看板视图",
+      "short_name": "看板",
+      "url": "/?view=kanban"
+    },
+    {
+      "name": "甘特图",
+      "short_name": "甘特",
+      "url": "/?view=gantt"
+    }
+  ]
+}

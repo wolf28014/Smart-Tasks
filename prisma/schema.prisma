@@ -1,0 +1,71 @@
+// Prisma schema for the TodoList app, mirroring the reference task_model.py
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  // Use absolute path so the Prisma Client runtime (which resolves
+  // relative URLs against process.cwd()) and the Prisma CLI (which
+  // resolves them against the schema file location) both point to the
+  // same file. Override via DATABASE_URL env var if you need a custom
+  // location.
+  url = "file:./db/custom.db"
+}
+
+model Task {
+  id            String    @id @default(cuid())
+  title         String
+  description   String    @default("")
+  dueDate       String?   // 'YYYY-MM-DD' or null
+  priority      String    @default("medium") // low | medium | high
+  status        String    @default("todo") // todo | in_progress | done | cancelled
+  recurrence    String?   // null | daily | weekly | monthly
+  tags          String    @default("[]") // JSON string array
+  subtasks      String    @default("[]") // JSON: [{id, title, done, order, dueDate}]
+  dependsOn     String    @default("[]") // JSON string array of task ids
+  pomodoros     Int       @default(0)
+  noteMarkdown  String?   // optional markdown note attached to the task
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  completedAt   DateTime?
+  deletedAt     DateTime? // soft-delete timestamp; null = active
+
+  @@index([status])
+  @@index([priority])
+  @@index([dueDate])
+  @@index([deletedAt])
+}
+
+model PomodoroSession {
+  id        String   @id @default(cuid())
+  taskId    String
+  startedAt DateTime @default(now())
+  endedAt   DateTime @default(now())
+  duration  Int      @default(1500) // seconds (25 min default)
+
+  @@index([taskId])
+  @@index([endedAt])
+}
+
+model Memo {
+  id        String   @id @default(cuid())
+  title     String   @default("")
+  content   String   @default("") // markdown body
+  pinned    Boolean  @default(false)
+  color     String   @default("default") // default | yellow | green | blue | pink | purple
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([pinned])
+  @@index([updatedAt])
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  name      String   @unique // tag name without leading '#'
+  color     String   @default("emerald") // emerald | amber | rose | violet | sky | teal | orange | slate
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
