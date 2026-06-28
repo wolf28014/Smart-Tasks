@@ -16,6 +16,7 @@ import {
   FileText,
   Play,
   GripVertical,
+  Sparkles,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import {
@@ -60,6 +61,8 @@ interface TaskCardProps {
   onToggleSubtask: (taskId: string, subtaskId: string) => void;
   onStartPomodoro?: (task: TaskData) => void;
   onOpenNote?: (task: TaskData) => void;
+  /** E2: open AI chat drawer scoped to this task */
+  onAskAI?: (task: TaskData) => void;
   highlight?: string[]; // terms to highlight (from TF-IDF)
   compact?: boolean;
 }
@@ -72,6 +75,7 @@ export function TaskCard({
   onToggleSubtask,
   onStartPomodoro,
   onOpenNote,
+  onAskAI,
   highlight,
   compact,
 }: TaskCardProps) {
@@ -192,6 +196,18 @@ export function TaskCard({
 
           {/* Hover actions */}
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            {onAskAI && (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7 hover:text-emerald-600"
+                onClick={() => onAskAI(task)}
+                aria-label="问问 AI"
+                title="问问 AI"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+              </Button>
+            )}
             {onStartPomodoro && !cancelled && (
               <Button
                 size="icon"

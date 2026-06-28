@@ -26,7 +26,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Calendar as CalendarIcon, X, Plus, RotateCcw, Info } from "lucide-react";
+import { Calendar as CalendarIcon, X, Plus, RotateCcw, Info, Sparkles, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { zhCN } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -87,6 +87,120 @@ export function TaskDialog({
   const [draftDismissed, setDraftDismissed] = useState(false);
 
   const tagCtx = useTagsOptional();
+
+  // A1: AI subtask splitting
+  const [aiSplitting, setAiSplitting] = useState(false);
+  const [aiSplitError, setAiSplitError] = useState<string | null>(null);
+  const [aiSplitPreview, setAiSplitPreview] = useState<
+    { title: string; rationale?: string }[] | null
+  >(null);
+
+  async function handleAiSplit() {
+    if (!title.trim()) {
+      setAiSplitError("请先输入任务标题");
+      return;
+    }
+    setAiSplitting(true);
+    setAiSplitError(null);
+    setAiSplitPreview(null);
+    try {
+      const res = await fetch("/api/ai/split-subtasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, description }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? "AI 拆解失败");
+      }
+      const data = await res.json();
+      setAiSplitPreview(data.subtasks ?? []);
+    } catch (err) {
+      setAiSplitError(err instanceof Error ? err.message : "未知错误");
+    } finally {
+      setAiSplitting(false);
+    }
+  }
+
+  function applyAiSplit() {
+    if (!aiSplitPreview) return;
+    const newSubtasks = aiSplitPreview.map((s, i) => ({
+      id: `s_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 7)}`,
+      title: s.title,
+      done: false,
+      order: subtasks.length + i,
+      dueDate: null,
+    }));
+    setSubtasks([...subtasks, ...newSubtasks]);
+    setAiSplitPreview(null);
+  }
+
+  // A4: AI tag suggestions
+  const [aiTagLoading, setAiTagLoading] = useState(false);
+  const [aiTagSuggestion, setAiTagSuggestion] = useState<{
+    suggested: string[];
+    newCandidates: string[];
+  } | null>(null);
+  const [aiTagError, setAiTagError] = useState<string | null>(null);
+
+  async function handleAiSuggestTags() {
+    if (!title.trim()) {
+      setAiTagError("请先输入任务标题");
+      return;
+    }
+    setAiTagLoading(true);
+    setAiTagError(null);
+    setAiTagSuggestion(null);
+    try {
+      const res = await fetch("/api/ai/suggest-tags", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          description,
+          existingTags: suggestedTags,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? "AI 标签建议失败");
+      }
+      const data = await res.json();
+      setAiTagSuggestion({
+        suggested: data.suggested ?? [],
+        newCandidates: data.newCandidates ?? [],
+      });
+    } catch (err) {
+      setAiTagError(err instanceof Error ? err.message : "未知错误");
+    } finally {
+      setAiTagLoading(false);
+    }
+  }
+
+  function applySuggestedTag(tag: string) {
+    if (!tags.includes(tag)) setTags([...tags, tag]);
+    setAiTagSuggestion((prev) =>
+      prev
+        ? {
+            ...prev,
+            suggested: prev.suggested.filter((t) => t !== tag),
+          }
+        : null,
+    );
+  }
+
+  function applyNewCandidate(tag: string) {
+    const t = tag.trim().replace(/^#/, "");
+    if (t && !tags.includes(t)) setTags([...tags, t]);
+    setAiTagSuggestion((prev) =>
+      prev
+        ? {
+            ...prev,
+            newCandidates: prev.newCandidates.filter((x) => x !== tag),
+          }
+        : null,
+    );
+  }
 
   // On open: load task data, OR restore unsaved draft (only for new tasks)
   useEffect(() => {
@@ -418,7 +532,24 @@ export function TaskDialog({
 
           {/* Tags */}
           <div className="space-y-1.5">
-            <Label>标签</Label>
+            <div className="flex items-center justify-between">
+              <Label>标签</Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs gap-1 text-emerald-600 hover:text-emerald-700 dark:text-emerald-400"
+                onClick={handleAiSuggestTags}
+                disabled={aiTagLoading || !title.trim()}
+              >
+                {aiTagLoading ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Sparkles className="h-3 w-3" />
+                )}
+                {aiTagLoading ? "AI 推荐中..." : "AI 推荐"}
+              </Button>
+            </div>
             <div className="flex gap-2">
               <Input
                 value={tagDraft}
@@ -506,12 +637,141 @@ export function TaskDialog({
                 </div>
               </div>
             )}
+
+            {/* AI tag suggestion results */}
+            {aiTagError && (
+              <p className="text-xs text-rose-600 dark:text-rose-400 pt-1">
+                {aiTagError}
+              </p>
+            )}
+            {aiTagSuggestion &&
+              (aiTagSuggestion.suggested.length > 0 ||
+                aiTagSuggestion.newCandidates.length > 0) && (
+                <div className="pt-1 rounded-md border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20 p-2 space-y-1.5">
+                  <div className="text-[11px] font-medium text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
+                    <Sparkles className="h-3 w-3" />
+                    AI 标签推荐
+                  </div>
+                  {aiTagSuggestion.suggested.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {aiTagSuggestion.suggested.map((tag) => {
+                        const color = tagCtx?.colorFor(tag) ?? "emerald";
+                        const meta = TAG_COLOR_META[normalizeTagColor(color)];
+                        return (
+                          <button
+                            key={tag}
+                            type="button"
+                            onClick={() => applySuggestedTag(tag)}
+                            className={cn(
+                              "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-xs hover:opacity-80 transition-opacity",
+                              meta.soft,
+                              meta.softText,
+                              meta.softBorder,
+                            )}
+                          >
+                            <Plus className="h-2.5 w-2.5" />
+                            {tag}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {aiTagSuggestion.newCandidates.length > 0 && (
+                    <div>
+                      <div className="text-[10px] text-muted-foreground mb-1">
+                        新标签建议（点击创建并添加）
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {aiTagSuggestion.newCandidates.map((tag) => (
+                          <button
+                            key={tag}
+                            type="button"
+                            onClick={() => applyNewCandidate(tag)}
+                            className="inline-flex items-center gap-1 rounded-md border border-dashed border-emerald-300 dark:border-emerald-700 bg-background px-2 py-0.5 text-xs text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-colors"
+                          >
+                            <Plus className="h-2.5 w-2.5" />
+                            {tag}
+                            <span className="text-[10px] text-muted-foreground">新</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
           </div>
 
           {/* Subtasks */}
           <div className="space-y-1.5">
-            <Label>子任务</Label>
+            <div className="flex items-center justify-between">
+              <Label>子任务</Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 text-xs gap-1 text-emerald-600 hover:text-emerald-700 dark:text-emerald-400"
+                onClick={handleAiSplit}
+                disabled={aiSplitting || !title.trim()}
+              >
+                {aiSplitting ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <Sparkles className="h-3 w-3" />
+                )}
+                {aiSplitting ? "AI 拆解中..." : "AI 拆解"}
+              </Button>
+            </div>
             <SubtaskEditor subtasks={subtasks} onChange={setSubtasks} />
+
+            {/* AI split preview */}
+            {aiSplitError && (
+              <p className="text-xs text-rose-600 dark:text-rose-400">
+                {aiSplitError}
+              </p>
+            )}
+            {aiSplitPreview && aiSplitPreview.length > 0 && (
+              <div className="rounded-md border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20 p-2.5 space-y-1.5">
+                <div className="text-[11px] font-medium text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
+                  <Sparkles className="h-3 w-3" />
+                  AI 建议的 {aiSplitPreview.length} 个子任务
+                </div>
+                <ul className="space-y-1">
+                  {aiSplitPreview.map((s, i) => (
+                    <li key={i} className="text-xs flex items-start gap-1.5">
+                      <span className="text-emerald-500 mt-0.5">•</span>
+                      <div>
+                        <div className="text-foreground">{s.title}</div>
+                        {s.rationale && (
+                          <div className="text-muted-foreground text-[11px] mt-0.5">
+                            {s.rationale}
+                          </div>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex gap-1.5 pt-1">
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="h-7 text-xs"
+                    onClick={applyAiSplit}
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    全部添加
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 text-xs"
+                    onClick={() => setAiSplitPreview(null)}
+                  >
+                    忽略
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Pomodoro */}

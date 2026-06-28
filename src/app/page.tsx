@@ -15,6 +15,7 @@ import {
   StickyNote,
   MoreHorizontal,
   Hash,
+  FileText,
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -56,6 +57,12 @@ import { PomodoroOverlay } from "@/components/todolist/pomodoro-overlay";
 import { BackgroundSelector } from "@/components/todolist/background-selector";
 import { TagManagerDialog } from "@/components/todolist/tag-manager-dialog";
 import { TagProvider, useTags } from "@/components/todolist/tag-provider";
+import { AIProvider } from "@/components/todolist/ai-provider";
+import { AiQuickCreate } from "@/components/todolist/ai-quick-create";
+import { AiVoiceButton } from "@/components/todolist/ai-voice-button";
+import { AiDailyFocus } from "@/components/todolist/ai-daily-focus";
+import { AiWeeklyReport } from "@/components/todolist/ai-weekly-report";
+import { AiChatDrawer } from "@/components/todolist/ai-chat-drawer";
 
 import {
   buildIndex,
@@ -96,7 +103,9 @@ const VIEWS: {
 export default function Home() {
   return (
     <TagProvider>
-      <HomeInner />
+      <AIProvider>
+        <HomeInner />
+      </AIProvider>
     </TagProvider>
   );
 }
@@ -126,6 +135,17 @@ function HomeInner() {
 
   // Tag manager dialog
   const [tagOpen, setTagOpen] = useState(false);
+
+  // AI weekly report dialog
+  const [reportOpen, setReportOpen] = useState(false);
+
+  // AI chat drawer (E1) — global, no task context
+  const [aiChatOpen, setAiChatOpen] = useState(false);
+  // AI chat drawer (E2) — task-scoped
+  const [aiChatTask, setAiChatTask] = useState<TaskData | null>(null);
+
+  // Voice transcription result (E3) — fed into A2 quick create
+  const [voiceText, setVoiceText] = useState<string | undefined>(undefined);
 
   // Pomodoro overlay
   const [pomodoroTask, setPomodoroTask] = useState<TaskData | null>(null);
@@ -647,6 +667,21 @@ function HomeInner() {
           </div>
         </div>
 
+        {/* AI quick create row — A2 (text input) + E3 (voice button) */}
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 pb-3">
+          <div className="flex items-center gap-2">
+            <div className="flex-1">
+              <AiQuickCreate
+                existingTags={suggestedTags}
+                onCreate={handleSaveTask}
+                prefilledText={voiceText}
+                onPrefilledConsumed={() => setVoiceText(undefined)}
+              />
+            </div>
+            <AiVoiceButton onTranscript={(text) => setVoiceText(text)} />
+          </div>
+        </div>
+
         {/* View tabs */}
         <div className="mx-auto max-w-7xl px-4 sm:px-6 pb-3">
           <nav className="flex items-center gap-1 rounded-lg bg-muted/60 p-1 w-fit max-w-full overflow-x-auto">
@@ -699,6 +734,7 @@ function HomeInner() {
             onToggleSubtask={handleToggleSubtask}
             onStartPomodoro={openPomodoro}
             onOpenNote={openNote}
+            onAskAI={(task) => setAiChatTask(task)}
             highlightTerms={search1.trim() ? highlightTerms : undefined}
             onNew={openNew}
           />
@@ -713,10 +749,26 @@ function HomeInner() {
             onToggleSubtask={handleToggleSubtask}
             onStartPomodoro={openPomodoro}
             onOpenNote={openNote}
+            onAskAI={(task) => setAiChatTask(task)}
             onNew={openNew}
           />
         )}
-        {view === "dashboard" && <DashboardView tasks={tasks} />}
+        {view === "dashboard" && (
+          <>
+            <AiDailyFocus tasks={tasks} onEdit={openEdit} />
+            <div className="flex justify-end mb-4">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setReportOpen(true)}
+              >
+                <FileText className="h-4 w-4 mr-1.5" />
+                生成 AI 周报
+              </Button>
+            </div>
+            <DashboardView tasks={tasks} />
+          </>
+        )}
         {view === "calendar" && (
           <CalendarView tasks={tasks} onEdit={openEdit} />
         )}
@@ -759,6 +811,19 @@ function HomeInner() {
         </div>
       </footer>
 
+      {/* Floating AI assistant button (E1) */}
+      <button
+        onClick={() => setAiChatOpen(true)}
+        className="fixed bottom-6 right-6 z-40 h-12 w-12 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all flex items-center justify-center group"
+        aria-label="AI 助手"
+        title="AI 助手"
+      >
+        <Sparkles className="h-5 w-5" />
+        <span className="absolute right-full mr-3 px-2 py-1 rounded-md bg-foreground text-background text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+          AI 助手
+        </span>
+      </button>
+
       {/* Task dialog */}
       <TaskDialog
         open={dialogOpen}
@@ -791,6 +856,22 @@ function HomeInner() {
         open={tagOpen}
         onOpenChange={setTagOpen}
         taskCountByTag={tagCountByTag}
+      />
+
+      {/* AI weekly report dialog (D1) */}
+      <AiWeeklyReport open={reportOpen} onOpenChange={setReportOpen} />
+
+      {/* AI chat drawer — E1 (global) or E2 (task-scoped) */}
+      <AiChatDrawer
+        open={aiChatOpen || !!aiChatTask}
+        onOpenChange={(o) => {
+          if (!o) {
+            setAiChatOpen(false);
+            setAiChatTask(null);
+          }
+        }}
+        contextTask={aiChatTask}
+        onActionExecuted={reload}
       />
 
       {/* Pomodoro overlay */}

@@ -33,6 +33,7 @@ interface KanbanViewProps {
   onToggleSubtask: (taskId: string, subtaskId: string) => void;
   onStartPomodoro: (task: TaskData) => void;
   onOpenNote: (task: TaskData) => void;
+  onAskAI?: (task: TaskData) => void;
   onNew: () => void;
 }
 
@@ -103,6 +104,7 @@ export function KanbanView(props: KanbanViewProps) {
             onToggleSubtask={props.onToggleSubtask}
             onStartPomodoro={props.onStartPomodoro}
             onOpenNote={props.onOpenNote}
+            onAskAI={props.onAskAI}
             onNew={props.onNew}
           />
         ))}
@@ -134,6 +136,7 @@ function KanbanColumn({
   onToggleSubtask,
   onStartPomodoro,
   onOpenNote,
+  onAskAI,
   onNew,
 }: {
   status: Status;
@@ -144,6 +147,7 @@ function KanbanColumn({
   onToggleSubtask: (taskId: string, subtaskId: string) => void;
   onStartPomodoro: (task: TaskData) => void;
   onOpenNote: (task: TaskData) => void;
+  onAskAI?: (task: TaskData) => void;
   onNew: () => void;
 }) {
   const meta = STATUS_META[status];
@@ -227,6 +231,7 @@ function KanbanColumn({
               onToggleSubtask={onToggleSubtask}
               onStartPomodoro={onStartPomodoro}
               onOpenNote={onOpenNote}
+              onAskAI={onAskAI}
             />
           ))
         )}
@@ -243,6 +248,7 @@ function DraggableTaskCard({
   onToggleSubtask,
   onStartPomodoro,
   onOpenNote,
+  onAskAI,
 }: {
   task: TaskData;
   onEdit: (task: TaskData) => void;
@@ -251,6 +257,7 @@ function DraggableTaskCard({
   onToggleSubtask: (taskId: string, subtaskId: string) => void;
   onStartPomodoro: (task: TaskData) => void;
   onOpenNote: (task: TaskData) => void;
+  onAskAI?: (task: TaskData) => void;
 }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: task.id,
@@ -281,6 +288,7 @@ function DraggableTaskCard({
         onToggleSubtask={onToggleSubtask}
         onStartPomodoro={onStartPomodoro}
         onOpenNote={onOpenNote}
+        onAskAI={onAskAI}
       />
     </div>
   );

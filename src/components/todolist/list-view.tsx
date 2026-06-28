@@ -48,6 +48,7 @@ interface ListViewProps {
   onToggleSubtask: (taskId: string, subtaskId: string) => void;
   onStartPomodoro: (task: TaskData) => void;
   onOpenNote: (task: TaskData) => void;
+  onAskAI?: (task: TaskData) => void;
   highlightTerms?: string[];
   onNew: () => void;
 }
@@ -70,6 +71,7 @@ export function ListView(props: ListViewProps) {
     onToggleSubtask,
     onStartPomodoro,
     onOpenNote,
+    onAskAI,
     highlightTerms,
     onNew,
   } = props;
@@ -126,6 +128,7 @@ export function ListView(props: ListViewProps) {
       onToggleSubtask={onToggleSubtask}
       onStartPomodoro={onStartPomodoro}
       onOpenNote={onOpenNote}
+      onAskAI={onAskAI}
       highlight={highlightTerms}
     />
   );
