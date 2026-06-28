@@ -167,7 +167,7 @@ export function TaskCard({
                     setUserTouched(true);
                     setExpanded((v) => !v);
                   }}
-                  className="text-muted-foreground hover:text-foreground transition-colors"
+                  className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
                   aria-label={expanded ? "折叠子任务" : "展开子任务"}
                 >
                   {expanded ? (
@@ -179,16 +179,16 @@ export function TaskCard({
               )}
               <h3
                 className={cn(
-                  "font-medium leading-snug break-words text-foreground",
-                  done && "line-through text-muted-foreground",
-                  cancelled && "line-through text-muted-foreground",
+                  "text-[15px] font-semibold leading-snug break-words text-foreground tracking-tight",
+                  done && "line-through text-muted-foreground font-medium",
+                  cancelled && "line-through text-muted-foreground font-medium",
                 )}
               >
                 {highlightText(task.title)}
               </h3>
             </div>
             {task.description && !compact && (
-              <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
+              <p className="mt-1.5 text-[13px] text-muted-foreground/80 line-clamp-2 leading-relaxed">
                 {highlightText(task.description)}
               </p>
             )}
@@ -261,7 +261,7 @@ export function TaskCard({
         </div>
 
         {/* Meta row: priority badge, status badge, due date, recurrence */}
-        <div className="mt-3 flex items-center gap-2 flex-wrap">
+        <div className="mt-3 pt-2.5 border-t border-border/40 flex items-center gap-1.5 flex-wrap">
           <span
             className={cn(
               "inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium",
