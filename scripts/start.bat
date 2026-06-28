@@ -46,9 +46,9 @@ if "%DB_EXISTS%"=="0" (
     echo [2/4] 数据库已存在 OK
 )
 
-REM 3. 检查端口 3000
-echo [3/4] 检查端口 3000...
-for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":3000" ^| findstr "LISTENING"') do (
+REM 3. 检查端口 3001
+echo [3/4] 检查端口 3001...
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":3001" ^| findstr "LISTENING"') do (
     echo       端口被占用，正在终止 PID %%a ...
     taskkill /PID %%a /F >nul 2>nul
 )
@@ -58,7 +58,7 @@ echo [4/4] 启动开发服务器...
 echo.
 echo ==========================================
 echo   启动后请在浏览器访问:
-echo   http://localhost:3000
+echo   http://localhost:3001
 echo ==========================================
 echo.
 echo 按 Ctrl+C 停止服务器
@@ -68,7 +68,7 @@ where bun >nul 2>nul
 if %errorlevel%==0 (
     call bun run dev
 ) else (
-    call npx next dev -p 3000
+    call npx next dev -p 3001
 )
 
 pause

@@ -17,9 +17,9 @@ WshShell.CurrentDirectory = projectRoot
 
 Dim cmd
 If fso.FileExists(projectRoot & "\node_modules\.bin\next") Then
-    cmd = "cmd /c node_modules\.bin\next dev -p 3000 > """ & logFile & """ 2>&1"
+    cmd = "cmd /c node_modules\.bin\next dev -p 3001 > """ & logFile & """ 2>&1"
 Else
-    cmd = "cmd /c npx next dev -p 3000 > """ & logFile & """ 2>&1"
+    cmd = "cmd /c npx next dev -p 3001 > """ & logFile & """ 2>&1"
 End If
 
 WshShell.Run cmd, 0, False
@@ -31,6 +31,6 @@ logStream.WriteLine "============================================"
 logStream.WriteLine Now & " - TodoList dev server started (background)"
 logStream.WriteLine "Project: " & projectRoot
 logStream.WriteLine "Log: " & logFile
-logStream.WriteLine "URL: http://localhost:3000"
+logStream.WriteLine "URL: http://localhost:3001"
 logStream.WriteLine "============================================"
 logStream.Close

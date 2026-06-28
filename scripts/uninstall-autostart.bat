@@ -27,7 +27,7 @@ echo.
 echo [2/2] Also stop running server? (Y/N)
 choice /c yn /n /m "(Y/N): "
 if %errorlevel%==1 (
-    for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":3000" ^| findstr "LISTENING"') do (
+    for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":3001" ^| findstr "LISTENING"') do (
         echo       Killing PID %%a
         taskkill /PID %%a /F >nul 2>nul
     )

@@ -2,7 +2,7 @@
 import json
 import urllib.request
 
-BASE = "http://localhost:3000"
+BASE = "http://localhost:3001"
 
 # 1. Get all tasks (including deleted)
 resp = urllib.request.urlopen(f"{BASE}/api/tasks?includeDeleted=1")

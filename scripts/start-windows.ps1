@@ -36,14 +36,14 @@ if (-not $dbExists) {
     Write-Host "[2/4] 数据库已存在 ✓" -ForegroundColor Green
 }
 
-# 3. 检查端口 3000 是否被占用
-Write-Host "[3/4] 检查端口 3000..." -ForegroundColor Yellow
+# 3. 检查端口 3001 是否被占用
+Write-Host "[3/4] 检查端口 3001..." -ForegroundColor Yellow
 $portInUse = $false
 try {
-    $conn = Get-NetTCPConnection -LocalPort 3000 -ErrorAction Stop
+    $conn = Get-NetTCPConnection -LocalPort 3001 -ErrorAction Stop
     if ($conn) {
         $portInUse = $true
-        Write-Host "      端口 3000 被占用，正在释放..." -ForegroundColor Yellow
+        Write-Host "      端口 3001 被占用，正在释放..." -ForegroundColor Yellow
         $pids = $conn.OwningProcess | Sort-Object -Unique
         foreach ($pid in $pids) {
             try {
@@ -60,7 +60,7 @@ try {
     # 端口未被占用，正常
 }
 if (-not $portInUse) {
-    Write-Host "      端口 3000 空闲 ✓" -ForegroundColor Green
+    Write-Host "      端口 3001 空闲 ✓" -ForegroundColor Green
 }
 
 # 4. 启动开发服务器
@@ -68,7 +68,7 @@ Write-Host "[4/4] 启动开发服务器..." -ForegroundColor Yellow
 Write-Host ""
 Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host "  启动后请在浏览器访问:" -ForegroundColor White
-Write-Host "  http://localhost:3000" -ForegroundColor Green
+Write-Host "  http://localhost:3001" -ForegroundColor Green
 Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "按 Ctrl+C 停止服务器" -ForegroundColor DarkGray
@@ -78,5 +78,5 @@ Write-Host ""
 if (Get-Command bun -ErrorAction SilentlyContinue) {
     bun run dev
 } else {
-    npx next dev -p 3000
+    npx next dev -p 3001
 }

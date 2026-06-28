@@ -48,7 +48,7 @@ echo ==========================================
 echo.
 echo Next steps:
 echo   - Server will auto-start on next login (no window)
-echo   - Visit http://localhost:3000 after login
+echo   - Visit http://localhost:3001 after login
 echo   - Log file: %PROJECT_DIR%\dev.log
 echo.
 echo Start now? Press Y to launch, any other key to exit.
@@ -60,7 +60,7 @@ if %errorlevel%==1 (
     echo Waiting 5 seconds for server to start...
     timeout /t 5 /nobreak >nul
     echo.
-    echo Now try opening http://localhost:3000 in your browser
+    echo Now try opening http://localhost:3001 in your browser
 )
 
 echo.

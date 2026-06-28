@@ -66,7 +66,7 @@ bun run db:push
 bun run dev
 ```
 
-打开 http://localhost:3000 即可使用，首次访问会自动注入 12 条示例任务。
+打开 http://localhost:3001 即可使用，首次访问会自动注入 12 条示例任务。
 
 > 💡 **不需要手动创建 `.env` 文件** —— 默认使用 `prisma/db/custom.db`，开箱即用。
 > 如需自定义路径，运行 `cp .env.example .env` 后编辑。
@@ -97,7 +97,7 @@ bun run dev
 3. 提示是否立即启动，按 `Y` 启动
 4. 完成 ✅
 
-之后每次开机登录后，dev server 会在后台自动启动（无窗口），直接浏览器访问 http://localhost:3000 即可。
+之后每次开机登录后，dev server 会在后台自动启动（无窗口），直接浏览器访问 http://localhost:3001 即可。
 
 **查看日志**：后台启动的日志写入 `dev.log` 文件，可随时查看排查问题。
 
@@ -113,7 +113,7 @@ bun run dev
 
 | 命令 | 说明 |
 |------|------|
-| `bun run dev` | 启动开发服务器（端口 3000） |
+| `bun run dev` | 启动开发服务器（端口 3001） |
 | `bun run build` | 构建生产版本 |
 | `bun run start` | 启动生产服务器 |
 | `bun run lint` | 运行 ESLint 检查 |
@@ -125,7 +125,7 @@ bun run dev
 
 ### 页面显示"加载失败"
 
-**步骤 1**：访问 http://localhost:3000/api/health 查看诊断信息
+**步骤 1**：访问 http://localhost:3001/api/health 查看诊断信息
 
 返回示例（正常）：
 ```json

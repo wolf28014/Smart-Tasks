@@ -9,7 +9,7 @@ echo ==========================================
 echo.
 
 set FOUND=0
-for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":3000" ^| findstr "LISTENING"') do (
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":3001" ^| findstr "LISTENING"') do (
     echo 终止进程 PID %%a ...
     taskkill /PID %%a /F >nul 2>nul
     if %errorlevel%==0 (
@@ -19,7 +19,7 @@ for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":3000" ^| findstr "LISTENING
 )
 
 if "%FOUND%"=="0" (
-    echo 端口 3000 没有运行中的服务器
+    echo 端口 3001 没有运行中的服务器
 )
 
 echo.
