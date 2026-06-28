@@ -159,7 +159,7 @@ export function TaskCard({
             className="mt-1 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500"
           />
 
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 pr-1 group-hover:pr-20 transition-[padding] duration-150">
             <div className="flex items-center gap-2 flex-wrap">
               {subTotal > 0 && (
                 <button
@@ -194,10 +194,10 @@ export function TaskCard({
             )}
           </div>
 
-          {/* Hover actions — absolute positioned so they don't squeeze
-              the title when hidden. They overlay the right edge of the
-              card on hover with a subtle gradient backdrop. */}
-          <div className="absolute right-2 top-2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-l from-card via-card/90 to-card/0 pl-6 pr-1 rounded-l-md">
+          {/* Hover actions — absolute positioned in the top-right corner.
+              The title container gets pr-20 on hover to make room, so
+              buttons never overlap the title text. */}
+          <div className="absolute right-2 top-2 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
             {onAskAI && (
               <Button
                 size="icon"
