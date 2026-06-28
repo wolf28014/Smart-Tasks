@@ -1,33 +1,36 @@
 import { PrismaClient } from "@prisma/client";
 import path from "node:path";
+import fs from "node:fs";
 
-// Prisma's SQLite relative paths are unreliable in Next.js dev mode
-// because the runtime client resolves them against its own working
-// directory (.next/dev/server/chunks/...), not the project root.
-// We compute an absolute path here and pass it explicitly to the
-// PrismaClient constructor so it always points to the right file
-// regardless of where the CLI created it.
+// Prisma's SQLite relative paths are tricky:
+//   - Prisma CLI (db:push) reads `file:./db/custom.db` from .env and
+//     resolves it RELATIVE TO the schema.prisma directory (prisma/),
+//     so the DB file ends up at <project>/prisma/db/custom.db
+//   - Prisma Client runtime resolves relative paths against its own
+//     working directory (.next/dev/server/chunks/ in dev mode), which
+//     is NOT the project root — so it looks in the wrong place.
 //
-// The .env file ships with `DATABASE_URL="file:./db/custom.db"` which
-// the Prisma CLI (db:push) resolves correctly to <project>/db/custom.db.
-// Here we resolve the same logical path to an absolute URL for the
-// runtime client.
+// Fix: in the runtime, we compute the absolute path to where the CLI
+// actually created the DB (<project>/prisma/db/custom.db) and pass it
+// explicitly to the PrismaClient constructor via `datasources.db.url`.
+// This overrides whatever path the CLI baked into the generated client.
 
 function resolveDatabaseUrl(): string {
   const envUrl = process.env.DATABASE_URL;
-  if (envUrl) {
-    // If it's already an absolute file: URL, use as-is
-    if (envUrl.startsWith("file:/")) return envUrl;
-    // If it's a relative file: URL, resolve against cwd
-    const match = envUrl.match(/^file:(.+)$/);
-    if (match) {
-      const relPath = match[1];
-      return `file:${path.resolve(process.cwd(), relPath)}`;
-    }
-    return envUrl;
-  }
-  // Fallback (shouldn't happen since .env ships with a default)
-  return `file:${path.resolve(process.cwd(), "db", "custom.db")}`;
+
+  // If DATABASE_URL is set and uses an absolute path, use it as-is.
+  if (envUrl && envUrl.startsWith("file:/")) return envUrl;
+
+  // For relative paths (or when DATABASE_URL is unset), compute the
+  // absolute path to <project>/prisma/db/custom.db.
+  //
+  // Why prisma/db/custom.db and not db/custom.db?
+  //   The Prisma CLI resolves `file:./db/custom.db` against the schema
+  //   directory, creating the file at prisma/db/custom.db. We mirror
+  //   that location here so the runtime client finds the same file.
+  const dbFileName = "custom.db";
+  const absPath = path.resolve(process.cwd(), "prisma", "db", dbFileName);
+  return `file:${absPath}`;
 }
 
 const globalForPrisma = globalThis as unknown as {
@@ -35,8 +38,19 @@ const globalForPrisma = globalThis as unknown as {
 };
 
 function createPrismaClient(): PrismaClient {
+  const url = resolveDatabaseUrl();
+  // Ensure the parent directory exists (Windows fails if it doesn't)
+  const dbPath = url.replace(/^file:/, "");
+  const dbDir = path.dirname(dbPath);
+  try {
+    if (!fs.existsSync(dbDir)) {
+      fs.mkdirSync(dbDir, { recursive: true });
+    }
+  } catch {
+    // Ignore — if we can't create the dir, Prisma will throw a clearer error
+  }
   return new PrismaClient({
-    datasources: { db: { url: resolveDatabaseUrl() } },
+    datasources: { db: { url } },
     log: ["error", "warn"],
   });
 }
@@ -58,7 +72,9 @@ export async function checkDb() {
       hint:
         "请确认已运行 `bun run db:push` 初始化数据库，并且 `.env` 文件存在。" +
         "当前 DATABASE_URL=" +
-        (process.env.DATABASE_URL || "(未设置)"),
+        (process.env.DATABASE_URL || "(未设置)") +
+        " · 解析后绝对路径=" +
+        resolveDatabaseUrl(),
     };
   }
 }
