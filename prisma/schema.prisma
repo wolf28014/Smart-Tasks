@@ -6,12 +6,12 @@ generator client {
 
 datasource db {
   provider = "sqlite"
-  // Use absolute path so the Prisma Client runtime (which resolves
-  // relative URLs against process.cwd()) and the Prisma CLI (which
-  // resolves them against the schema file location) both point to the
-  // same file. Override via DATABASE_URL env var if you need a custom
-  // location.
-  url = "file:./db/custom.db"
+  // Read DATABASE_URL from environment (set in .env file).
+  // The .env file ships with the project and points to prisma/db/custom.db
+  // using a path relative to the project root. Both the Prisma CLI
+  // (db:push) and the Prisma Client runtime read the same value, so
+  // they always agree on where the SQLite file lives.
+  url = env("DATABASE_URL")
 }
 
 model Task {

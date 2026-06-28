@@ -1,27 +1,37 @@
 import { PrismaClient } from "@prisma/client";
 import path from "node:path";
 
-// Resolve DATABASE_URL with a sensible default for SQLite so the app does not
-// crash silently when the user forgets to create .env.
+// Prisma's SQLite relative paths are unreliable in Next.js dev mode
+// because the runtime client resolves them against its own working
+// directory (.next/dev/server/chunks/...), not the project root.
+// We compute an absolute path here and pass it explicitly to the
+// PrismaClient constructor so it always points to the right file
+// regardless of where the CLI created it.
 //
-// IMPORTANT: Prisma's CLI and the Prisma Client runtime resolve relative
-// SQLite URLs against DIFFERENT base directories:
-//   - CLI (db:push, migrate): relative to prisma/schema.prisma
-//   - Runtime client: relative to process.cwd()
-// So `file:./db/custom.db` in schema.prisma creates the DB at
-// `prisma/db/custom.db` via the CLI, but the runtime looks for it at
-// `./db/custom.db` (i.e. project root). To avoid this mismatch we always
-// pass an absolute URL to the PrismaClient constructor.
+// The .env file ships with `DATABASE_URL="file:./db/custom.db"` which
+// the Prisma CLI (db:push) resolves correctly to <project>/db/custom.db.
+// Here we resolve the same logical path to an absolute URL for the
+// runtime client.
+
 function resolveDatabaseUrl(): string {
-  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
-  // Default absolute path — matches what `prisma db push` creates when
-  // schema.prisma uses `url = "file:./db/custom.db"`.
-  return `file:${path.join(process.cwd(), "prisma", "db", "custom.db")}`;
+  const envUrl = process.env.DATABASE_URL;
+  if (envUrl) {
+    // If it's already an absolute file: URL, use as-is
+    if (envUrl.startsWith("file:/")) return envUrl;
+    // If it's a relative file: URL, resolve against cwd
+    const match = envUrl.match(/^file:(.+)$/);
+    if (match) {
+      const relPath = match[1];
+      return `file:${path.resolve(process.cwd(), relPath)}`;
+    }
+    return envUrl;
+  }
+  // Fallback (shouldn't happen since .env ships with a default)
+  return `file:${path.resolve(process.cwd(), "db", "custom.db")}`;
 }
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
-  __dbError?: Error;
 };
 
 function createPrismaClient(): PrismaClient {
@@ -31,10 +41,7 @@ function createPrismaClient(): PrismaClient {
   });
 }
 
-// Surface a friendly error during API calls instead of crashing silently.
-export const db =
-  globalForPrisma.prisma ??
-  createPrismaClient();
+export const db = globalForPrisma.prisma ?? createPrismaClient();
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = db;
 
@@ -51,7 +58,7 @@ export async function checkDb() {
       hint:
         "请确认已运行 `bun run db:push` 初始化数据库，并且 `.env` 文件存在。" +
         "当前 DATABASE_URL=" +
-        (process.env.DATABASE_URL || "(未设置，使用默认 ./db/custom.db)"),
+        (process.env.DATABASE_URL || "(未设置)"),
     };
   }
 }

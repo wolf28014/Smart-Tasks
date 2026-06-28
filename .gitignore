@@ -30,8 +30,11 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (keep .env.example tracked, ignore real .env)
-.env
+# env files
+# .env is committed for this project because it only contains the SQLite
+# database path (no secrets). This ensures `bun run db:push` and the
+# runtime client both find the same DB file out of the box.
+# Override locally with .env.local if you need a custom path.
 .env.local
 .env*.local
 
