@@ -47,6 +47,7 @@ import {
 } from "@/lib/task-utils";
 import { TAG_COLOR_META, normalizeTagColor } from "@/lib/tag-utils";
 import { useTagsOptional } from "@/lib/tag-context";
+import { useAIOptional } from "./ai-provider";
 import {
   saveTaskDraft,
   loadTaskDraft,
@@ -87,6 +88,7 @@ export function TaskDialog({
   const [draftDismissed, setDraftDismissed] = useState(false);
 
   const tagCtx = useTagsOptional();
+  const ai = useAIOptional();
 
   // A1: AI subtask splitting
   const [aiSplitting, setAiSplitting] = useState(false);
@@ -534,21 +536,23 @@ export function TaskDialog({
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <Label>标签</Label>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-7 text-xs gap-1 text-emerald-600 hover:text-emerald-700 dark:text-emerald-400"
-                onClick={handleAiSuggestTags}
-                disabled={aiTagLoading || !title.trim()}
-              >
-                {aiTagLoading ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <Sparkles className="h-3 w-3" />
-                )}
-                {aiTagLoading ? "AI 推荐中..." : "AI 推荐"}
-              </Button>
+              {ai?.enabled && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs gap-1 text-emerald-600 hover:text-emerald-700 dark:text-emerald-400"
+                  onClick={handleAiSuggestTags}
+                  disabled={aiTagLoading || !title.trim()}
+                >
+                  {aiTagLoading ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3 w-3" />
+                  )}
+                  {aiTagLoading ? "AI 推荐中..." : "AI 推荐"}
+                </Button>
+              )}
             </div>
             <div className="flex gap-2">
               <Input
@@ -705,21 +709,23 @@ export function TaskDialog({
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <Label>子任务</Label>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="h-7 text-xs gap-1 text-emerald-600 hover:text-emerald-700 dark:text-emerald-400"
-                onClick={handleAiSplit}
-                disabled={aiSplitting || !title.trim()}
-              >
-                {aiSplitting ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <Sparkles className="h-3 w-3" />
-                )}
-                {aiSplitting ? "AI 拆解中..." : "AI 拆解"}
-              </Button>
+              {ai?.enabled && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs gap-1 text-emerald-600 hover:text-emerald-700 dark:text-emerald-400"
+                  onClick={handleAiSplit}
+                  disabled={aiSplitting || !title.trim()}
+                >
+                  {aiSplitting ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-3 w-3" />
+                  )}
+                  {aiSplitting ? "AI 拆解中..." : "AI 拆解"}
+                </Button>
+              )}
             </div>
             <SubtaskEditor subtasks={subtasks} onChange={setSubtasks} />
 

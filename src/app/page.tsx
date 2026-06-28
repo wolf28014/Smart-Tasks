@@ -16,11 +16,13 @@ import {
   MoreHorizontal,
   Hash,
   FileText,
+  Settings,
 } from "lucide-react";
 import { motion } from "framer-motion";
 
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -57,12 +59,13 @@ import { PomodoroOverlay } from "@/components/todolist/pomodoro-overlay";
 import { BackgroundSelector } from "@/components/todolist/background-selector";
 import { TagManagerDialog } from "@/components/todolist/tag-manager-dialog";
 import { TagProvider, useTags } from "@/components/todolist/tag-provider";
-import { AIProvider } from "@/components/todolist/ai-provider";
+import { AIProvider, useAI } from "@/components/todolist/ai-provider";
 import { AiQuickCreate } from "@/components/todolist/ai-quick-create";
 import { AiVoiceButton } from "@/components/todolist/ai-voice-button";
 import { AiDailyFocus } from "@/components/todolist/ai-daily-focus";
 import { AiWeeklyReport } from "@/components/todolist/ai-weekly-report";
 import { AiChatDrawer } from "@/components/todolist/ai-chat-drawer";
+import { SettingsDialog } from "@/components/todolist/settings-dialog";
 
 import {
   buildIndex,
@@ -112,6 +115,7 @@ export default function Home() {
 
 function HomeInner() {
   const tagCtx = useTags();
+  const ai = useAI();
   const [view, setView] = useState<ViewKey>("list");
   const [tasks, setTasks] = useState<TaskData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -138,6 +142,9 @@ function HomeInner() {
 
   // AI weekly report dialog
   const [reportOpen, setReportOpen] = useState(false);
+
+  // AI settings dialog
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // AI chat drawer (E1) — global, no task context
   const [aiChatOpen, setAiChatOpen] = useState(false);
@@ -656,6 +663,22 @@ function HomeInner() {
                   导入 / 导出数据
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setSettingsOpen(true)}>
+                  <Settings className="h-4 w-4 mr-2" />
+                  AI 设置
+                  <span
+                    className={cn(
+                      "ml-auto h-1.5 w-1.5 rounded-full",
+                      ai.enabled
+                        ? "bg-emerald-500"
+                        : "bg-muted-foreground/40",
+                    )}
+                    title={
+                      ai.enabled ? "AI 已启用" : "AI 未启用（点击配置）"
+                    }
+                  />
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 <div className="sm:hidden px-2 py-1.5">
                   <AutoSaveIndicator
                     lastMutationAt={lastMutationAt}
@@ -667,20 +690,23 @@ function HomeInner() {
           </div>
         </div>
 
-        {/* AI quick create row — A2 (text input) + E3 (voice button) */}
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 pb-3">
-          <div className="flex items-center gap-2">
-            <div className="flex-1">
-              <AiQuickCreate
-                existingTags={suggestedTags}
-                onCreate={handleSaveTask}
-                prefilledText={voiceText}
-                onPrefilledConsumed={() => setVoiceText(undefined)}
-              />
+        {/* AI quick create row — A2 (text input) + E3 (voice button)
+            Only shown when AI is enabled. */}
+        {ai.enabled && (
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 pb-3">
+            <div className="flex items-center gap-2">
+              <div className="flex-1">
+                <AiQuickCreate
+                  existingTags={suggestedTags}
+                  onCreate={handleSaveTask}
+                  prefilledText={voiceText}
+                  onPrefilledConsumed={() => setVoiceText(undefined)}
+                />
+              </div>
+              <AiVoiceButton onTranscript={(text) => setVoiceText(text)} />
             </div>
-            <AiVoiceButton onTranscript={(text) => setVoiceText(text)} />
           </div>
-        </div>
+        )}
 
         {/* View tabs */}
         <div className="mx-auto max-w-7xl px-4 sm:px-6 pb-3">
@@ -734,7 +760,9 @@ function HomeInner() {
             onToggleSubtask={handleToggleSubtask}
             onStartPomodoro={openPomodoro}
             onOpenNote={openNote}
-            onAskAI={(task) => setAiChatTask(task)}
+            onAskAI={
+              ai.enabled ? (task) => setAiChatTask(task) : undefined
+            }
             highlightTerms={search1.trim() ? highlightTerms : undefined}
             onNew={openNew}
           />
@@ -749,23 +777,27 @@ function HomeInner() {
             onToggleSubtask={handleToggleSubtask}
             onStartPomodoro={openPomodoro}
             onOpenNote={openNote}
-            onAskAI={(task) => setAiChatTask(task)}
+            onAskAI={
+              ai.enabled ? (task) => setAiChatTask(task) : undefined
+            }
             onNew={openNew}
           />
         )}
         {view === "dashboard" && (
           <>
-            <AiDailyFocus tasks={tasks} onEdit={openEdit} />
-            <div className="flex justify-end mb-4">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setReportOpen(true)}
-              >
-                <FileText className="h-4 w-4 mr-1.5" />
-                生成 AI 周报
-              </Button>
-            </div>
+            {ai.enabled && <AiDailyFocus tasks={tasks} onEdit={openEdit} />}
+            {ai.enabled && (
+              <div className="flex justify-end mb-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setReportOpen(true)}
+                >
+                  <FileText className="h-4 w-4 mr-1.5" />
+                  生成 AI 周报
+                </Button>
+              </div>
+            )}
             <DashboardView tasks={tasks} />
           </>
         )}
@@ -811,18 +843,20 @@ function HomeInner() {
         </div>
       </footer>
 
-      {/* Floating AI assistant button (E1) */}
-      <button
-        onClick={() => setAiChatOpen(true)}
-        className="fixed bottom-6 right-6 z-40 h-12 w-12 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all flex items-center justify-center group"
-        aria-label="AI 助手"
-        title="AI 助手"
-      >
-        <Sparkles className="h-5 w-5" />
-        <span className="absolute right-full mr-3 px-2 py-1 rounded-md bg-foreground text-background text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-          AI 助手
-        </span>
-      </button>
+      {/* Floating AI assistant button (E1) — only when AI enabled */}
+      {ai.enabled && (
+        <button
+          onClick={() => setAiChatOpen(true)}
+          className="fixed bottom-6 right-6 z-40 h-12 w-12 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-lg hover:shadow-xl hover:scale-105 transition-all flex items-center justify-center group"
+          aria-label="AI 助手"
+          title="AI 助手"
+        >
+          <Sparkles className="h-5 w-5" />
+          <span className="absolute right-full mr-3 px-2 py-1 rounded-md bg-foreground text-background text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+            AI 助手
+          </span>
+        </button>
+      )}
 
       {/* Task dialog */}
       <TaskDialog
@@ -860,6 +894,9 @@ function HomeInner() {
 
       {/* AI weekly report dialog (D1) */}
       <AiWeeklyReport open={reportOpen} onOpenChange={setReportOpen} />
+
+      {/* AI settings dialog */}
+      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
 
       {/* AI chat drawer — E1 (global) or E2 (task-scoped) */}
       <AiChatDrawer

@@ -2,46 +2,71 @@
 
 // Global AI state provider.
 //
-// Currently tracks:
-//   - whether AI features are available (set to false if any AI call
-//     returns a config/availability error, so we can hide AI buttons)
+// Tracks:
+//   - whether AI features are enabled & configured (fetched from
+//     /api/ai/settings on mount, refreshed when settings dialog saves)
 //   - a global "busy" flag for showing a loading indicator when AI
 //     operations are in flight
 //
-// In the future this can also hold per-feature toggles (e.g. user
-// preferences for which AI features to show).
+// Components that render AI entry points (buttons, banners) check
+// `enabled` to decide whether to show themselves at all. When AI is
+// not configured, the UI degrades gracefully without broken buttons.
 
-import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react";
 
 interface AIContextValue {
-  /** True if at least one AI call has succeeded. False until first call. */
-  available: boolean | null; // null = unknown (not yet tested)
-  /** True if AI is known to be unavailable (config missing etc). */
-  disabled: boolean;
+  /** True if AI is enabled AND has a valid API key configured. */
+  enabled: boolean;
+  /** True if we've finished the initial settings fetch. */
+  loaded: boolean;
   /** Track in-flight AI operations for UI feedback. */
   busy: boolean;
-  markAvailable: () => void;
-  markUnavailable: () => void;
+  /** Re-fetch AI settings from server (call after saving settings). */
+  refresh: () => Promise<void>;
   setBusy: (b: boolean) => void;
 }
 
 const AIContext = createContext<AIContextValue | null>(null);
 
 export function AIProvider({ children }: { children: ReactNode }) {
-  const [available, setAvailable] = useState<boolean | null>(null);
+  const [enabled, setEnabled] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const markAvailable = useCallback(() => setAvailable(true), []);
-  const markUnavailable = useCallback(() => setAvailable(false), []);
+  const refresh = useCallback(async () => {
+    try {
+      const res = await fetch("/api/ai/settings", { cache: "no-store" });
+      if (res.ok) {
+        const data = await res.json();
+        setEnabled(!!data.enabled && !!data.hasApiKey);
+      } else {
+        setEnabled(false);
+      }
+    } catch {
+      setEnabled(false);
+    } finally {
+      setLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
 
   return (
     <AIContext.Provider
       value={{
-        available,
-        disabled: available === false,
+        enabled,
+        loaded,
         busy,
-        markAvailable,
-        markUnavailable,
+        refresh,
         setBusy,
       }}
     >
@@ -59,7 +84,7 @@ export function useAI(): AIContextValue {
 }
 
 // Optional variant — components that want to gracefully render even
-// when no provider is mounted (e.g. deep in legacy code paths).
+// when no provider is mounted.
 export function useAIOptional(): AIContextValue | null {
   return useContext(AIContext);
 }
